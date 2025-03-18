@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Branch Manager - Video Recorder</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+            max-width: 800px;
+            width: 100%;
+        }
+        #manager-video {
+            width: 300px; /* Reduced AI Manager Video Size */
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        #video-preview, #recorded-video {
+            width: 100%;
+            border-radius: 10px;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 10px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>AI Branch Manager</h2>
+        <video id="manager-video" controls>
+            <source src="{{ url_for('static', filename='Manager.mp4') }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        
+        <h2>Record Your Video</h2>
+        <video id="video-preview" autoplay></video>
+        <br>
+        <button id="start-recording">Start Recording</button>
+        <button id="stop-recording" disabled>Stop Recording</button>
+        <button id="upload-video" disabled>Upload Video</button>
+
+        <h3>Recorded Video:</h3>
+        <video id="recorded-video" controls></video>
+    </div>
+
+    <div>
+        <button id="upload-doc" onclick="window.location.href='/upload-page'">Upload Documents</button>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        let stream;
+
+        document.getElementById("start-recording").addEventListener("click", async function () {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById("video-preview").srcObject = stream;
+
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = event => recordedChunks.push(event.data);
+            
+            mediaRecorder.start();
+
+            document.getElementById("start-recording").disabled = true;
+            document.getElementById("stop-recording").disabled = false;
+        });
+
+        document.getElementById("stop-recording").addEventListener("click", function () {
+            mediaRecorder.stop();
+            stream.getTracks().forEach(track => track.stop());
+
+            mediaRecorder.onstop = function () {
+                const blob = new Blob(recordedChunks, { type: "video/webm" });
+                const url = URL.createObjectURL(blob);
+                document.getElementById("recorded-video").src = url;
+                
+                document.getElementById("upload-video").disabled = false;
+            };
+
+            document.getElementById("start-recording").disabled = false;
+            document.getElementById("stop-recording").disabled = true;
+        });
+
+        document.getElementById("upload-video").addEventListener("click", async function () {
+            const blob = new Blob(recordedChunks, { type: "video/webm" });
+            const formData = new FormData();
+            formData.append("video", blob, "recorded-video.webm");
+
+            const response = await fetch("/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            if (response.ok) {
+                alert("Video uploaded successfully!");
+            } else {
+                alert("Video upload failed!");
+            }
+        });
+    </script>
+
+</body>
+</html>
